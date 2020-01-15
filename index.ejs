@@ -1,0 +1,24 @@
+<% htmlWebpackPlugin.options.links = htmlWebpackPlugin.options.links || [] %><%
+htmlWebpackPlugin.options.scripts = htmlWebpackPlugin.options.scripts || []
+%><!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title><%= htmlWebpackPlugin.options.title %></title>
+    <% for (item of htmlWebpackPlugin.options.links) { %> <%
+        if (typeof item === 'string' || item instanceof String) { item = { href: item, rel: 'stylesheet' } }
+    %><link <% for (key in item) { %> <%= key %>="<%= item[key] %>"<% } %> /><%
+    } %> <%
+    for (item of htmlWebpackPlugin.options.scripts) { %><%
+        if (typeof item === 'string' || item instanceof String) { item = { src: item, type: 'text/javascript' } } %>
+    <script <% for (key in item) { %> <%= key %>="<%= item[key] %>"<% } %>></script><%
+    } %>
+</head>
+<body>
+
+<div class="engage-pdfviewer">
+
+</div>
+
+</body>
+</html>

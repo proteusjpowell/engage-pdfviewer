@@ -1,0 +1,45 @@
+{
+  "name": "engage-pdfviewer",
+  "version": "1.0.0",
+  "description": "PDF.JS Viewer Customization For Engage",
+  "main": "bundle.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "webpack --mode development",
+    "build:production": "webpack --mode production",
+    "watch": "webpack --watch",
+    "serve": "webpack-dev-server --open"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ProteusCO/engage-pdfviewer.git"
+  },
+  "keywords": [
+    "pdf.js",
+    "viewer",
+    "engage"
+  ],
+  "author": "Russ Tennant",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/ProteusCO/engage-pdfviewer/issues"
+  },
+  "homepage": "https://github.com/ProteusCO/engage-pdfviewer#readme",
+  "devDependencies": {
+    "@babel/core": "^7.7.7",
+    "@babel/preset-env": "^7.7.7",
+    "babel-loader": "^8.0.6",
+    "clean-webpack-plugin": "^3.0.0",
+    "copy-webpack-plugin": "^5.1.1",
+    "css-loader": "^3.4.1",
+    "file-loader": "^5.0.2",
+    "html-webpack-plugin": "^3.2.0",
+    "style-loader": "^1.1.2",
+    "webpack": "^4.41.5",
+    "webpack-cli": "^3.3.10",
+    "webpack-dev-server": "^3.10.1"
+  },
+  "dependencies": {
+    "pdfjs-dist": "^2.2.228"
+  }
+}
