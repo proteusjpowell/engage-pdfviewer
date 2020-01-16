@@ -1,3 +1,5 @@
+import fullScreenApi from "./fullscreen";
+
 if (!window.pdfjsLib || !window.pdfjsViewer ||
 		!pdfjsLib.getDocument || !pdfjsViewer.PDFViewer) {
 	console.log("Please include the pdfjs-dist library.");
@@ -10,6 +12,12 @@ let animationStartedPromise;
 		window.requestAnimationFrame(resolve);
 	});
 })();
+
+let id = 0;
+function generateId() {
+	id++;
+	return `epdf_${id}`;
+}
 
 // Best explanation I can found for some settings is in the chrome extension
 //   see extensions/chromium/preferences_schema.json in the pdfjs project
@@ -41,6 +49,7 @@ const MAX_SCALE = 10.0;
 // Default zoom level of the viewer. Accepted values: 'auto', 'page-actual', 'page-width', 'page-height', 'page-fit', or a zoom level in percents.
 const DEFAULT_SCALE_VALUE = "auto";
 
+
 class EngagePDFViewer {
 
 	/**
@@ -56,6 +65,18 @@ class EngagePDFViewer {
 		this.pdfContainer = document.createElement("div");
 		this.pdfContainer.classList.add("pdfViewerContainer");
 		this.viewerContainer.appendChild(this.pdfContainer);
+		this.viewerContainer.addEventListener('touchstart', (evt) => {
+			this.viewerContainer.classList.add("active");
+			this.pdfContainer.classList.add("active");
+		});
+		document.documentElement.addEventListener("touchend", (evt) => {
+			const found = evt.path.find((el) => el.classList && el.classList.contains("engage-pdfviewer"));
+			if (!found) {
+				// console.log("Touched outside pdf viewer. Deactivating.");
+				this.viewerContainer.classList.remove("active");
+				this.pdfContainer.classList.remove("active");
+			}
+		});
 
 		this.pdfLoadingTask = null;
 		this.pdfDocument = null;
@@ -75,18 +96,6 @@ class EngagePDFViewer {
 	 */
 	open(options) {
 		animationStartedPromise.then(() => this._open(options));
-	}
-
-	get supportsFullscreen() {
-		let support;
-		const doc = document.documentElement;
-		support = !!(doc.requestFullscreen || doc.mozRequestFullScreen || doc.webkitRequestFullScreen || doc.msRequestFullscreen);
-
-		if (document.fullscreenEnabled === false || document.mozFullScreenEnabled === false || document.webkitFullscreenEnabled === false || document.msFullscreenEnabled === false) {
-			support = false;
-		}
-
-		return support;
 	}
 
 	get title() {
@@ -153,6 +162,16 @@ class EngagePDFViewer {
 					this.hideLoadingBar();
 					this.toolbar.removeAttribute("hidden");
 					this._loadMetaData();
+					if (this.pdfViewer.pageCount === 1) {
+						this.pagerTotal.parentNode.remove();
+						this.previousPageButton.parentNode.remove();
+					}
+					setTimeout(() => {
+						let scrollWidth = this.pdfContainer.offsetWidth - this.pdfContainer.clientWidth;
+						if (scrollWidth < 0) scrollWidth = 0;
+						this.pdfContainer.setAttribute("data-scrollwidth", scrollWidth);
+						this.viewerContainer.setAttribute("data-scrollwidth", scrollWidth);
+					}, 50);
 				},
 				(exception) => {
 					let message = exception && exception.message;
@@ -307,6 +326,7 @@ class EngagePDFViewer {
 		let bar = document.createElement("div");
 		bar.classList.add("toolbar");
 		bar.appendChild(this._createNavButtons());
+		bar.appendChild(this._createPager());
 		bar.appendChild(this._createZoomButtons());
 		bar.appendChild(this._createDownloadButton());
 		bar.appendChild(this._createFullscreenButton());
@@ -337,6 +357,39 @@ class EngagePDFViewer {
 		});
 		this.previousPageButton = previous;
 		this.nextPageButton = next;
+		return container;
+	}
+
+	_createPager() {
+		let container = document.createElement("div");
+		container.classList.add("pager-con");
+		let pagerLabel = document.createElement("label");
+		let inputId = generateId();
+		pagerLabel.setAttribute("for", inputId);
+		pagerLabel.innerText = "Page";
+		pagerLabel.classList.add("pager-label");
+		container.appendChild(pagerLabel);
+		let pageNumber = document.createElement("input");
+		pageNumber.setAttribute("id", inputId);
+		pageNumber.setAttribute("type", "number");
+		pageNumber.setAttribute("size", "3");
+		pageNumber.setAttribute("value", "1");
+		pageNumber.classList.add("pager-number");
+		pageNumber.addEventListener("click", function() {
+			this.select();
+		});
+		pageNumber.addEventListener("change", () => {
+			let newPage = pageNumber.value;
+			if (newPage === '') return;
+			this.page = parseInt(newPage, 10);
+			pageNumber.value = this.page;
+		});
+		container.appendChild(pageNumber);
+		let pageTotal = document.createElement("span");
+		pageTotal.classList.add("page-total");
+		container.appendChild(pageTotal);
+		this.pagerNumber = pageNumber;
+		this.pagerTotal = pageTotal;
 		return container;
 	}
 
@@ -402,23 +455,31 @@ class EngagePDFViewer {
 			linkService: this.pdfLinkService,
 		});
 		this.pdfLinkService.setHistory(this.pdfHistory);
-		if (this.supportsFullscreen) {
+		if (fullScreenApi.supportsFullscreen) {
 			this.fullscreenButton.addEventListener('click', () => {
-				if (document.fullscreen || document.fullscreenElement !== null) {
-					if (document.exitFullscreen) document.exitFullscreen();
+				if (fullScreenApi.isFullscreen()) {
+					fullScreenApi.exitFullscreen();
 				} else {
-					this.viewerContainer.requestFullscreen();
+					fullScreenApi.requestFullscreen(this.viewerContainer);
 				}
 			});
-			document.addEventListener("fullscreenchange", () => {
-				if (document.fullscreen || document.fullscreenElement !== null) {
+			document.addEventListener(fullScreenApi.fullscreenEventName, () => {
+				if (fullScreenApi.isFullscreen()) {
+					this.viewerContainer.classList.add("fullscreen");
 					this.fullscreenButton.innerText = "Exit Full Screen";
 					this.pdfViewer.currentScaleValue = "page-actual";
 					this.scrollPageIntoView(this.page);
 				} else {
+					this.viewerContainer.classList.remove("fullscreen");
 					this.fullscreenButton.innerText = "Full Screen";
 					this.pdfViewer.currentScaleValue = DEFAULT_SCALE_VALUE;
-					scrollPageIntoView(this.page);
+					this.scrollPageIntoView(this.page);
+					setTimeout(() => {
+						if (this.pdfContainer.scrollWidth > this.pdfContainer.clientWidth) {
+							console.log("Resetting scale");
+							this.pdfViewer.currentScaleValue = DEFAULT_SCALE_VALUE;
+						}
+					}, 100);
 				}
 			});
 		} else {
@@ -431,9 +492,7 @@ class EngagePDFViewer {
 			this.handleNavigationEnabling();
 		});
 
-		document.addEventListener(
-				"pagechanging",
-				(evt) => {
+		document.addEventListener("pagechanging", (evt) => {
 					this.handleNavigationEnabling(evt.detail.pageNumber);
 				},
 				true
@@ -443,6 +502,8 @@ class EngagePDFViewer {
 	handleNavigationEnabling(pageNumber) {
 		let page = pageNumber || this.page;
 		let numPages = this.pagesCount;
+		this.pagerNumber.value = page;
+		this.pagerTotal.innerText = `of ${numPages}`;
 		this.previousPageButton.disabled = page <= 1;
 		this.nextPageButton.disabled = page >= numPages;
 	}

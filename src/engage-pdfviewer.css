@@ -13,6 +13,7 @@
  * limitations under the License.
  */
 
+/*https://developer.mozilla.org/en-US/docs/Web/CSS/::backdrop*/
 
 .hidden {
     display: none;
@@ -29,9 +30,44 @@
     max-height: 80vh;
     margin: 0 auto;
 }
+.engage-pdfviewer.fullscreen {
+    max-width: 100%;
+    max-height: 100%;
+    width: 100%;
+    height: 100%;
+}
 .pdfViewerContainer {
     overflow: auto;
 }
+
+/* Hide scrollbar and toolbar when not focused: #1. Change engage-pdfviewer to pdfViewerContainer to always show buttons. */
+.engage-pdfviewer {
+    visibility: hidden;
+    transition: visibility 0s 0.2s;
+    padding-bottom: 4px;
+}
+.engage-pdfviewer.fullscreen {
+    visibility: visible;
+}
+.engage-pdfviewer.active,
+.engage-pdfviewer:hover,
+.engage-pdfviewer:active,
+.pdfViewer {
+    transition: visibility 0s 0.2s;
+    visibility: visible;
+}
+
+/* Hide scrollbar and toolbar when not focused: #2 */
+/*.pdfViewerContainer {
+    overflow: hidden;
+    padding-right: 16px; !*Guess how wide the widest scrollbar is on all browsers and platforms*!
+}
+.pdfViewerContainer.active,
+.pdfViewerContainer:hover,
+.pdfViewerContainer:active {
+    overflow: auto;
+    padding-right: 0;
+}*/
 
 canvas {
     margin: auto;
@@ -51,12 +87,14 @@ canvas {
     padding: 0.5rem;
     resize: none;
 }
-.pdfViewerContainer .toolbar {
+.engage-pdfviewer .toolbar {
     display: flex;
-    justify-content: space-between;
+    justify-content: space-evenly;
+}
+.engage-pdfviewer .toolbar .btn {
+    margin: 0 2px;
+}
+.pager-number {
+    width: 4ch;
 }
 
-:fullscreen,
-::fullscreen /* Safari */ {
-    /* Full Screen Styles */
-}

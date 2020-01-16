@@ -12,6 +12,10 @@ module.exports = {
 	devtool: 'source-map',
 	devServer: {
 		contentBase: './dist',
+		allowedHosts: [
+				'localhost',
+				'.dev.proteus.co'
+		]
 	},
 	plugins: [
 		new CleanWebpackPlugin(),
