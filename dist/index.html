@@ -1,26 +1,18 @@
-<% htmlWebpackPlugin.options.links = htmlWebpackPlugin.options.links || [] %><%
-htmlWebpackPlugin.options.scripts = htmlWebpackPlugin.options.scripts || []
-%><!DOCTYPE html>
+<!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8">
-    <title><%= htmlWebpackPlugin.options.title %></title>
-    <% for (item of htmlWebpackPlugin.options.links) { %> <%
-        if (typeof item === 'string' || item instanceof String) {
-            item = {href: item, rel: 'stylesheet'}
-        }
-    %>
-    <link <% for (key in item) { %> <%= key %>="<%= item[key] %>"<% } %> />
-    <%
-    } %>
-    <%
-    for (item of htmlWebpackPlugin.options.scripts) { %><%
-        if (typeof item === 'string' || item instanceof String) {
-            item = {src: item, type: 'text/javascript'}
-        } %>
-    <script <% for (key in item) { %> <%= key %>="<%= item[key] %>"<% } %>></script>
-    <%
-    } %>
+    <title>Testing</title>
+     
+    <link  href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.11.2/css/all.min.css" rel="stylesheet" />
+     
+    <link  href="css/engage-pdfviewer.css" rel="stylesheet" />
+    
+    
+    <script  src="https://unpkg.com/pdfjs-dist@2.2.228/build/pdf.min.js" type="text/javascript"></script>
+    
+    <script  src="https://unpkg.com/pdfjs-dist@2.2.228/web/pdf_viewer.js" type="text/javascript"></script>
+    
 </head>
 <body>
 <header>
@@ -60,5 +52,5 @@ htmlWebpackPlugin.options.scripts = htmlWebpackPlugin.options.scripts || []
     purpose (injected humour and the like).
 </p>
 <div class="engage-pdfviewer" data-url="pdfs/links.pdf"></div>
-</body>
+<script type="text/javascript" src="engage-pdfviewer.js"></script><script type="text/javascript" src="example.js"></script></body>
 </html>

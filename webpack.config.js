@@ -7,7 +7,7 @@ module.exports = {
 	mode: 'development',
 	entry: {
 		"engage-pdfviewer": ['./src/engage-pdfviewer.js'],
-		app: './src/index.js'
+		example: './src/index.js'
 	},
 	devtool: 'source-map',
 	devServer: {
@@ -23,14 +23,12 @@ module.exports = {
 			inject: true,
 			template: "index.ejs",
 			links: [
-				'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.11.2/css/fontawesome.min.css',
-				'https://unpkg.com/pdfjs-dist@2.2.228/web/pdf_viewer.css',
-				'/css/engage-pdfviewer.css'
+				'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.11.2/css/all.min.css',
+				'css/engage-pdfviewer.css'
 			],
 			scripts: [
 				'https://unpkg.com/pdfjs-dist@2.2.228/build/pdf.min.js',
 				'https://unpkg.com/pdfjs-dist@2.2.228/web/pdf_viewer.js',
-				// 'https://unpkg.com/pdfjs-dist@2.2.228/lib/web/pdf_presentation_mode.js'
 			],
 			title: 'Testing'
 		}),

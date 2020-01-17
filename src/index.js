@@ -1,7 +1,5 @@
 
-function init() {
-	// const DEFAULT_URL = "/pdfs/Engage_One_Pager.pdf";
-	const DEFAULT_URL = "/pdfs/compressed.tracemonkey-pldi-09.pdf";
+function example() {
 
 	try {
 		document.querySelectorAll(".engage-pdfviewer").forEach((el) =>{
@@ -12,4 +10,4 @@ function init() {
 		console.error(e);
 	}
 }
-init();
+example();

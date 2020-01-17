@@ -37,9 +37,6 @@ const TEXT_LAYER_MODE = 1;
 //  4 = in top window.
 const EXTERNAL_LINK_TARGET = 0;
 const MAX_IMAGE_SIZE = 1024 * 1024;
-const CMAP_URL = "https://unpkg.com/pdfjs-dist@2.2.228/cmaps/";
-const CMAP_PACKED = true;
-pdfjsLib.GlobalWorkerOptions.workerSrc = "https://unpkg.com/pdfjs-dist@2.2.228/build/pdf.worker.js";
 
 const DEFAULT_SCALE = 1.0;
 const CSS_UNITS = 96/72;
@@ -54,7 +51,7 @@ class EngagePDFViewer {
 
 	/**
 	 * Construct a PDF viewer for the specified container.
-	 * @param viewContainer.
+	 * @param viewerContainer the view container.
 	 */
 	constructor(viewerContainer) {
 		this.viewerContainer = viewerContainer;
@@ -65,12 +62,17 @@ class EngagePDFViewer {
 		this.pdfContainer = document.createElement("div");
 		this.pdfContainer.classList.add("pdfViewerContainer");
 		this.viewerContainer.appendChild(this.pdfContainer);
+		if (!this.viewerContainer.hasAttribute("id")) {
+			this.viewerContainer.setAttribute("id", generateId());
+		}
 		this.viewerContainer.addEventListener('touchstart', (evt) => {
 			this.viewerContainer.classList.add("active");
 			this.pdfContainer.classList.add("active");
 		});
 		document.documentElement.addEventListener("touchend", (evt) => {
-			const found = evt.path.find((el) => el.classList && el.classList.contains("engage-pdfviewer"));
+			const path = evt.path || (evt.composedPath && evt.composedPath());
+			if (!path) return;
+			const found = path.find((el) => el.classList && el.classList.contains("engage-pdfviewer"));
 			if (!found) {
 				// console.log("Touched outside pdf viewer. Deactivating.");
 				this.viewerContainer.classList.remove("active");
@@ -86,13 +88,14 @@ class EngagePDFViewer {
 		this.l10n = null;
 		this.metadata = null;
 		this.documentInfo = null;
+		this.pagesinited = false;
 
 		this._createUI();
 	}
 
 	/**
 	 * Open a PDF.
-	 * @param options options are: url, worker_url. "url" is required.
+	 * @param options options are: url. "url" is required.
 	 */
 	open(options) {
 		animationStartedPromise.then(() => this._open(options));
@@ -114,7 +117,9 @@ class EngagePDFViewer {
 	}
 
 	get pagesCount() {
-		return this.pdfDocument.numPages;
+		let doc = this.pdfDocument;
+		if (doc) return doc.numPages;
+		else return 0;
 	}
 
 	set page(val) {
@@ -125,94 +130,6 @@ class EngagePDFViewer {
 
 	get page() {
 		return this.pdfViewer.currentPageNumber;
-	}
-
-	_open(options) {
-		if (this.pdfLoadingTask) {
-			return this.close().then(
-					function () {
-						// ... and repeat the open() call.
-						return this._open(params);
-					}.bind(this)
-			);
-		}
-		if (options.worker_url && pdfjsLib.GlobalWorkerOptions.workerSrc !== options.worker_url) {
-			pdfjsLib.GlobalWorkerOptions.workerSrc = options.worker_url;
-		}
-		this.url = options.url;
-		// Loading document.
-		const loadingTask = pdfjsLib.getDocument({
-			url: options.url,
-			maxImageSize: MAX_IMAGE_SIZE,
-		});
-		this.pdfLoadingTask = loadingTask;
-		this.showLoadingBar();
-		this._clearData();
-		loadingTask.onProgress = (progressData) => {
-			this.loadingBar.max = progressData.total;
-			this.loadingBar.value = progressData.loaded;
-		};
-		return loadingTask.promise.then(
-				(pdfDocument) => {
-					// Document loaded, specifying document for the viewer.
-					this.pdfDocument = pdfDocument;
-					this.pdfViewer.setDocument(pdfDocument);
-					this.pdfLinkService.setDocument(pdfDocument);
-					this.pdfHistory.initialize({fingerprint: pdfDocument.fingerprint});
-					this.hideLoadingBar();
-					this.toolbar.removeAttribute("hidden");
-					this._loadMetaData();
-					if (this.pdfViewer.pageCount === 1) {
-						this.pagerTotal.parentNode.remove();
-						this.previousPageButton.parentNode.remove();
-					}
-					setTimeout(() => {
-						let scrollWidth = this.pdfContainer.offsetWidth - this.pdfContainer.clientWidth;
-						if (scrollWidth < 0) scrollWidth = 0;
-						this.pdfContainer.setAttribute("data-scrollwidth", scrollWidth);
-						this.viewerContainer.setAttribute("data-scrollwidth", scrollWidth);
-					}, 50);
-				},
-				(exception) => {
-					let message = exception && exception.message;
-					let l10n = this.l10n;
-					let loadingErrorMessage;
-
-					if (exception instanceof pdfjsLib.InvalidPDFException) {
-						// change error message also for other builds
-						loadingErrorMessage = l10n.get(
-								"invalid_file_error",
-								null,
-								"Invalid or corrupted PDF file."
-						);
-					} else if (exception instanceof pdfjsLib.MissingPDFException) {
-						// special message for missing PDFs
-						loadingErrorMessage = l10n.get(
-								"missing_file_error",
-								null,
-								"Missing PDF file."
-						);
-					} else if (exception instanceof pdfjsLib.UnexpectedResponseException) {
-						loadingErrorMessage = l10n.get(
-								"unexpected_response_error",
-								null,
-								"Unexpected server response."
-						);
-					} else {
-						loadingErrorMessage = l10n.get(
-								"loading_error",
-								null,
-								"An error occurred while loading the PDF."
-						);
-					}
-
-					loadingErrorMessage.then((msg) => {
-						this._showError(msg + "\n" + message);
-					});
-					this.hideLoadingBar();
-					this.toolbar.setAttribute("hidden", "");
-				}
-		);
 	}
 
 	scrollPageIntoView(pageNumber) {
@@ -280,6 +197,91 @@ class EngagePDFViewer {
 		this.pdfViewer.currentScaleValue = newScale;
 	}
 
+	_open(options) {
+		if (this.pdfLoadingTask) {
+			return this.close().then(
+					function () {
+						// ... and repeat the open() call.
+						return this._open(params);
+					}.bind(this)
+			);
+		}
+		if (options.worker_url && pdfjsLib.GlobalWorkerOptions.workerSrc !== options.worker_url) {
+			pdfjsLib.GlobalWorkerOptions.workerSrc = options.worker_url;
+		}
+		this.url = options.url;
+		// Loading document.
+		const loadingTask = pdfjsLib.getDocument({
+			url: options.url,
+			maxImageSize: MAX_IMAGE_SIZE,
+		});
+		this.pdfLoadingTask = loadingTask;
+		this.showLoadingBar();
+		this._clearData();
+		loadingTask.onProgress = (progressData) => {
+			this.loadingBar.max = progressData.total | 0;
+			this.loadingBar.value = progressData.loaded | 0;
+		};
+		return loadingTask.promise.then(
+				(pdfDocument) => {
+					// Document loaded, specifying document for the viewer.
+					this.pdfDocument = pdfDocument;
+					this.pdfViewer.setDocument(pdfDocument);
+					this.pdfLinkService.setDocument(pdfDocument);
+					this.pdfHistory.initialize({fingerprint: pdfDocument.fingerprint});
+					this.hideLoadingBar();
+					this.toolbar.removeAttribute("hidden");
+					this._loadMetaData();
+					setTimeout(() => {
+						if (this.pagesCount === 1) {
+							this.pagerTotal.parentNode.remove();
+							this.previousPageButton.parentNode.remove();
+						}
+						this._rescaleIfNecessary();
+					}, 50);
+				},
+				(exception) => {
+					let message = exception && exception.message;
+					let l10n = this.l10n;
+					let loadingErrorMessage;
+
+					if (exception instanceof pdfjsLib.InvalidPDFException) {
+						// change error message also for other builds
+						loadingErrorMessage = l10n.get(
+								"invalid_file_error",
+								null,
+								"Invalid or corrupted PDF file."
+						);
+					} else if (exception instanceof pdfjsLib.MissingPDFException) {
+						// special message for missing PDFs
+						loadingErrorMessage = l10n.get(
+								"missing_file_error",
+								null,
+								"Missing PDF file."
+						);
+					} else if (exception instanceof pdfjsLib.UnexpectedResponseException) {
+						loadingErrorMessage = l10n.get(
+								"unexpected_response_error",
+								null,
+								"Unexpected server response."
+						);
+					} else {
+						loadingErrorMessage = l10n.get(
+								"loading_error",
+								null,
+								"An error occurred while loading the PDF."
+						);
+					}
+
+					loadingErrorMessage.then((msg) => {
+						this._showError(msg + "\n" + message);
+					});
+					this.hideLoadingBar();
+					this.toolbar.setAttribute("hidden", "");
+				}
+		);
+	}
+
 	_clearData() {
 		this.metadata = null;
 		this.documentInfo = null;
@@ -338,14 +340,16 @@ class EngagePDFViewer {
 		let container = document.createElement("div");
 		container.classList.add("nav-con");
 		let previous = document.createElement("button");
+		previous.classList.add("btn");
 		previous.classList.add("nav-btn");
-		previous.classList.add("nav-previous");
+		previous.classList.add("previous-btn");
 		previous.setAttribute("title", "Previous Page");
 		previous.innerText = "Previous";
 		container.appendChild(previous);
 		let next = document.createElement("button");
+		next.classList.add("btn");
 		next.classList.add("nav-btn");
-		next.classList.add("nav-next");
+		next.classList.add("next-btn");
 		next.innerText = "Next";
 		next.setAttribute("title", "Next Page");
 		container.appendChild(next);
@@ -386,7 +390,7 @@ class EngagePDFViewer {
 		});
 		container.appendChild(pageNumber);
 		let pageTotal = document.createElement("span");
-		pageTotal.classList.add("page-total");
+		pageTotal.classList.add("pager-total");
 		container.appendChild(pageTotal);
 		this.pagerNumber = pageNumber;
 		this.pagerTotal = pageTotal;
@@ -397,14 +401,16 @@ class EngagePDFViewer {
 		let container = document.createElement("div");
 		container.classList.add("zoom-con");
 		let zoomOut = document.createElement("button");
+		zoomOut.classList.add("btn");
 		zoomOut.classList.add("zoom-btn");
-		zoomOut.classList.add("zoom-out");
+		zoomOut.classList.add("zoom-out-btn");
 		zoomOut.setAttribute("title", "Zoom Out");
 		zoomOut.textContent = "-";
 		container.appendChild(zoomOut);
 		let zoomIn = document.createElement("button");
+		zoomIn.classList.add("btn");
 		zoomIn.classList.add("zoom-btn");
-		zoomIn.classList.add("zoom-in");
+		zoomIn.classList.add("zoom-in-btn");
 		zoomIn.setAttribute("title", "Zoom In");
 		zoomIn.textContent = "+";
 		container.appendChild(zoomIn);
@@ -419,6 +425,7 @@ class EngagePDFViewer {
 
 	_createDownloadButton() {
 		let download = document.createElement("button");
+		download.classList.add("btn");
 		download.classList.add("download-btn");
 		download.setAttribute("title", "Download");
 		download.textContent = "Download";
@@ -430,6 +437,7 @@ class EngagePDFViewer {
 
 	_createFullscreenButton() {
 		let fullscreenButton = document.createElement("button");
+		fullscreenButton.classList.add("btn");
 		fullscreenButton.classList.add("fullscreen-btn");
 		fullscreenButton.setAttribute("title", "Switch To Presentation Mode");
 		fullscreenButton.innerText = "Full Screen";
@@ -440,7 +448,6 @@ class EngagePDFViewer {
 	_initUI() {
 		this.pdfLinkService = new pdfjsViewer.PDFLinkService();
 		this.l10n = pdfjsViewer.NullL10n;
-		// const eventBus = pdfjsViewer.getGlobalEventBus;
 		let pdfViewer = new pdfjsViewer.PDFViewer({
 			container: this.pdfContainer,
 			linkService: this.pdfLinkService,
@@ -463,7 +470,11 @@ class EngagePDFViewer {
 					fullScreenApi.requestFullscreen(this.viewerContainer);
 				}
 			});
-			document.addEventListener(fullScreenApi.fullscreenEventName, () => {
+			document.addEventListener(fullScreenApi.fullscreenEventName, (evt) => {
+				if (evt.target.id !== this.viewerContainer.id) {
+					// console.log("evt not for me", evt);
+					return;
+				}
 				if (fullScreenApi.isFullscreen()) {
 					this.viewerContainer.classList.add("fullscreen");
 					this.fullscreenButton.innerText = "Exit Full Screen";
@@ -474,33 +485,55 @@ class EngagePDFViewer {
 					this.fullscreenButton.innerText = "Full Screen";
 					this.pdfViewer.currentScaleValue = DEFAULT_SCALE_VALUE;
 					this.scrollPageIntoView(this.page);
-					setTimeout(() => {
-						if (this.pdfContainer.scrollWidth > this.pdfContainer.clientWidth) {
-							console.log("Resetting scale");
-							this.pdfViewer.currentScaleValue = DEFAULT_SCALE_VALUE;
-						}
-					}, 100);
+					this._rescaleIfNecessary();
 				}
 			});
 		} else {
 			this.fullscreenButton.remove();
 		}
 
-		document.addEventListener("pagesinit", () => {
+		document.addEventListener("pagesinit", (evt) => {
+			if (this.pagesinited) {
+				// If there is more than one viewer on a page, this will get called multiple times
+				return;
+			}
+			this.pagesinited = true;
 			// We can use pdfViewer now, e.g. let's change default scale.
-			this.pdfViewer.currentScaleValue = DEFAULT_SCALE_VALUE;
-			this.handleNavigationEnabling();
+			setTimeout(() => {
+				this._handleNavigationEnabling();
+				this._rescaleIfNecessary();
+			}, 100);
+
 		});
 
 		document.addEventListener("pagechanging", (evt) => {
-					this.handleNavigationEnabling(evt.detail.pageNumber);
+					// We cannot determine which pdf viewer on the page triggered this event, so be careful
+					this._handleNavigationEnabling();
 				},
 				true
 		);
 	}
 
-	handleNavigationEnabling(pageNumber) {
-		let page = pageNumber || this.page;
+	_rescaleIfNecessary(tryCount) {
+		let newTryCount = (tryCount||0) + 1;
+		if (newTryCount > 10) {
+			console.log("Giving up trying to rescale.");
+			return;
+		}/* else {
+			console.log(`Rescale try#${newTryCount} for div#${this.viewerContainer.id}`);
+		}*/
+		setTimeout(() => {
+			let hasScrollBar = this.pdfContainer.scrollWidth > this.pdfContainer.clientWidth;
+			// console.log(`div#${this.viewerContainer.id} hasScrollBar=${hasScrollBar}`);
+			if (hasScrollBar) {
+				this.pdfViewer.currentScaleValue = DEFAULT_SCALE_VALUE;
+				this._rescaleIfNecessary(newTryCount);
+			}
+		}, 50);
+	}
+
+	_handleNavigationEnabling() {
+		let page = this.page;
 		let numPages = this.pagesCount;
 		this.pagerNumber.value = page;
 		this.pagerTotal.innerText = `of ${numPages}`;
@@ -517,6 +550,7 @@ class EngagePDFViewer {
 			console.log(
 					"PDF " +
 					this.pdfDocument.fingerprint +
+					", " + (data.info.Title || data.info.Subject || "-") +
 					" [" +
 					data.info.PDFFormatVersion +
 					" " +
@@ -524,6 +558,7 @@ class EngagePDFViewer {
 					" / " +
 					(data.info.Creator || "-").trim() +
 					"]" +
+					(data.info.IsAcroFormPresent ? " AcroForm " : "") +
 					" (PDF.js: " +
 					(pdfjsLib.version || "-") +
 					")"
