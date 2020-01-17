@@ -1,7 +1,11 @@
 <% htmlWebpackPlugin.options.links = htmlWebpackPlugin.options.links || [] %><%
 htmlWebpackPlugin.options.scripts = htmlWebpackPlugin.options.scripts || []
 %><!DOCTYPE html>
-<html>
+<html mozdisallowselectionprint>
+<!--
+ NOTE: mozdisallowselectionprint prevents bad printing and possible browser crash
+ https://bugzilla.mozilla.org/show_bug.cgi?id=830278
+-->
 <head>
     <meta charset="utf-8">
     <title><%= htmlWebpackPlugin.options.title %></title>

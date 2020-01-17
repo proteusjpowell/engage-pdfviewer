@@ -1,5 +1,5 @@
 import fullScreenApi from "./fullscreen";
-
+// Rendering issue references: https://www.pdftron.com/blog/pdf-js/guide-to-pdf-js-rendering/
 if (!window.pdfjsLib || !window.pdfjsViewer ||
 		!pdfjsLib.getDocument || !pdfjsViewer.PDFViewer) {
 	console.log("Please include the pdfjs-dist library.");
@@ -19,6 +19,18 @@ function generateId() {
 	return `epdf_${id}`;
 }
 
+const userAgent =
+		(typeof navigator !== "undefined" && navigator.userAgent) || "";
+const platform =
+		(typeof navigator !== "undefined" && navigator.platform) || "";
+const maxTouchPoints =
+		(typeof navigator !== "undefined" && navigator.maxTouchPoints) || 1;
+
+const isAndroid = /Android/.test(userAgent);
+const isIOS =
+		/\b(iPad|iPhone|iPod)(?=;)/.test(userAgent) ||
+		(platform === "MacIntel" && maxTouchPoints > 1);
+
 // Best explanation I can found for some settings is in the chrome extension
 //   see extensions/chromium/preferences_schema.json in the pdfjs project
 
@@ -27,7 +39,7 @@ const USE_ONLY_CSS_ZOOM = false;
 //  0 = Disabled.
 //  1 = Enabled.
 //  2 = (Experimental) Enabled, with enhanced text selection.
-const TEXT_LAYER_MODE = 1;
+const TEXT_LAYER_MODE = 2;
 // externalLinkTarget:
 // Controls how external links will be opened.
 //  0 = default.
@@ -35,9 +47,11 @@ const TEXT_LAYER_MODE = 1;
 //  2 = new window/tab.
 //  3 = parent.
 //  4 = in top window.
-const EXTERNAL_LINK_TARGET = 0;
-const MAX_IMAGE_SIZE = 1024 * 1024;
-
+const EXTERNAL_LINK_TARGET = 2;
+// Limit canvas size to 5 mega-pixels on mobile.
+// Support: Android, iOS
+const MAX_MOBILE_IMAGE_SIZE = 5242880;
+const CMAP_PACKED = true;
 const DEFAULT_SCALE = 1.0;
 const CSS_UNITS = 96/72;
 const DEFAULT_SCALE_DELTA = 1.1;
@@ -88,8 +102,7 @@ class EngagePDFViewer {
 		this.l10n = null;
 		this.metadata = null;
 		this.documentInfo = null;
-		this.pagesinited = false;
-
+		this.eventBus = new pdfjsViewer.EventBus({dispatchToDOM: false});
 		this._createUI();
 	}
 
@@ -211,10 +224,12 @@ class EngagePDFViewer {
 		}
 		this.url = options.url;
 		// Loading document.
-		const loadingTask = pdfjsLib.getDocument({
+		let docOptions = {
 			url: options.url,
-			maxImageSize: MAX_IMAGE_SIZE,
-		});
+		};
+		if (isIOS || isAndroid)
+			docOptions.maxImageSize = MAX_MOBILE_IMAGE_SIZE;
+		const loadingTask = pdfjsLib.getDocument(docOptions);
 		this.pdfLoadingTask = loadingTask;
 		this.showLoadingBar();
 		this._clearData();
@@ -237,7 +252,6 @@ class EngagePDFViewer {
 							this.pagerTotal.parentNode.remove();
 							this.previousPageButton.parentNode.remove();
 						}
-						this._rescaleIfNecessary();
 					}, 50);
 				},
 				(exception) => {
@@ -344,6 +358,7 @@ class EngagePDFViewer {
 		previous.classList.add("nav-btn");
 		previous.classList.add("previous-btn");
 		previous.setAttribute("title", "Previous Page");
+		previous.setAttribute("type", "button");
 		previous.innerText = "Previous";
 		container.appendChild(previous);
 		let next = document.createElement("button");
@@ -352,6 +367,7 @@ class EngagePDFViewer {
 		next.classList.add("next-btn");
 		next.innerText = "Next";
 		next.setAttribute("title", "Next Page");
+		next.setAttribute("type", "button");
 		container.appendChild(next);
 		previous.addEventListener("click", () => {
 			this.page--;
@@ -380,6 +396,8 @@ class EngagePDFViewer {
 		pageNumber.setAttribute("value", "1");
 		pageNumber.classList.add("pager-number");
 		pageNumber.addEventListener("click", function() {
+			evt.preventDefault();
+			evt.stopPropagation();
 			this.select();
 		});
 		pageNumber.addEventListener("change", () => {
@@ -405,6 +423,7 @@ class EngagePDFViewer {
 		zoomOut.classList.add("zoom-btn");
 		zoomOut.classList.add("zoom-out-btn");
 		zoomOut.setAttribute("title", "Zoom Out");
+		zoomOut.setAttribute("type", "button");
 		zoomOut.textContent = "-";
 		container.appendChild(zoomOut);
 		let zoomIn = document.createElement("button");
@@ -412,12 +431,17 @@ class EngagePDFViewer {
 		zoomIn.classList.add("zoom-btn");
 		zoomIn.classList.add("zoom-in-btn");
 		zoomIn.setAttribute("title", "Zoom In");
+		zoomIn.setAttribute("type", "button");
 		zoomIn.textContent = "+";
 		container.appendChild(zoomIn);
-		zoomIn.addEventListener("click", () => {
+		zoomIn.addEventListener("click", (evt) => {
+			evt.preventDefault();
+			evt.stopPropagation();
 			this.zoomIn();
 		});
-		zoomOut.addEventListener("click", () => {
+		zoomOut.addEventListener("click", (evt) => {
+			evt.preventDefault();
+			evt.stopPropagation();
 			this.zoomOut();
 		});
 		return container;
@@ -428,8 +452,11 @@ class EngagePDFViewer {
 		download.classList.add("btn");
 		download.classList.add("download-btn");
 		download.setAttribute("title", "Download");
+		download.setAttribute("type", "button");
 		download.textContent = "Download";
 		download.addEventListener("click", () => {
+			evt.preventDefault();
+			evt.stopPropagation();
 			window.location = this.url;
 		});
 		return download;
@@ -440,13 +467,17 @@ class EngagePDFViewer {
 		fullscreenButton.classList.add("btn");
 		fullscreenButton.classList.add("fullscreen-btn");
 		fullscreenButton.setAttribute("title", "Switch To Presentation Mode");
+		fullscreenButton.setAttribute("type", "button");
 		fullscreenButton.innerText = "Full Screen";
 		this.fullscreenButton = fullscreenButton;
 		return fullscreenButton;
 	}
 
 	_initUI() {
-		this.pdfLinkService = new pdfjsViewer.PDFLinkService();
+		this.pdfLinkService = new pdfjsViewer.PDFLinkService({
+			eventBus: this.eventBus,
+			externalLinkTarget: EXTERNAL_LINK_TARGET,
+		});
 		this.l10n = pdfjsViewer.NullL10n;
 		let pdfViewer = new pdfjsViewer.PDFViewer({
 			container: this.pdfContainer,
@@ -454,12 +485,15 @@ class EngagePDFViewer {
 			l10n: this.l10n,
 			useOnlyCssZoom: USE_ONLY_CSS_ZOOM,
 			textLayerMode: TEXT_LAYER_MODE,
+			eventBus: this.eventBus,
+			cMapPacked: CMAP_PACKED,
 		});
 		this.pdfViewer = pdfViewer;
 		this.pdfLinkService.setViewer(pdfViewer);
 
 		this.pdfHistory = new pdfjsViewer.PDFHistory({
 			linkService: this.pdfLinkService,
+			eventBus: this.eventBus,
 		});
 		this.pdfLinkService.setHistory(this.pdfHistory);
 		if (fullScreenApi.supportsFullscreen) {
@@ -492,22 +526,17 @@ class EngagePDFViewer {
 			this.fullscreenButton.remove();
 		}
 
-		document.addEventListener("pagesinit", (evt) => {
-			if (this.pagesinited) {
-				// If there is more than one viewer on a page, this will get called multiple times
-				return;
-			}
-			this.pagesinited = true;
+		this.eventBus.on("pagesinit", () => {
 			// We can use pdfViewer now, e.g. let's change default scale.
+			this.pdfViewer.currentScaleValue = DEFAULT_SCALE_VALUE;
 			setTimeout(() => {
 				this._handleNavigationEnabling();
 				this._rescaleIfNecessary();
-			}, 100);
+			}, 10);
 
 		});
 
-		document.addEventListener("pagechanging", (evt) => {
-					// We cannot determine which pdf viewer on the page triggered this event, so be careful
+		this.eventBus.on("pagechanging", () => {
 					this._handleNavigationEnabling();
 				},
 				true
@@ -517,7 +546,7 @@ class EngagePDFViewer {
 	_rescaleIfNecessary(tryCount) {
 		let newTryCount = (tryCount||0) + 1;
 		if (newTryCount > 10) {
-			console.log("Giving up trying to rescale.");
+			console.log(`Giving up trying to rescale for div#${this.viewerContainer.id}.`);
 			return;
 		}/* else {
 			console.log(`Rescale try#${newTryCount} for div#${this.viewerContainer.id}`);
