@@ -190,12 +190,28 @@ function () {
       this.viewerContainer.setAttribute("id", generateId());
     }
 
+    this.pdfLoadingTask = null;
+    this.pdfDocument = null;
+    this.pdfViewer = null;
+    this.pdfHistory = null;
+    this.pdfLinkService = null;
+    this.l10n = null;
+    this.metadata = null;
+    this.documentInfo = null;
+    this.eventBus = new pdfjsViewer.EventBus({
+      dispatchToDOM: false
+    });
+    this.scrollToPage = 0;
+
+    this._createUI(); // Touch support for activating and deactivating scrollbars (if setup in CSS)
+
+
     this.viewerContainer.addEventListener('touchstart', function (evt) {
       _this.viewerContainer.classList.add("active");
 
       _this.pdfContainer.classList.add("active");
     });
-    document.documentElement.addEventListener("touchend", function (evt) {
+    document.documentElement.addEventListener("touchstart", function (evt) {
       var path = evt.path || evt.composedPath && evt.composedPath();
       if (!path) return;
       var found = path.find(function (el) {
@@ -209,19 +225,43 @@ function () {
         _this.pdfContainer.classList.remove("active");
       }
     });
-    this.pdfLoadingTask = null;
-    this.pdfDocument = null;
-    this.pdfViewer = null;
-    this.pdfHistory = null;
-    this.pdfLinkService = null;
-    this.l10n = null;
-    this.metadata = null;
-    this.documentInfo = null;
-    this.eventBus = new pdfjsViewer.EventBus({
-      dispatchToDOM: false
-    });
 
-    this._createUI();
+    var zoomer = function zoomer(evt) {
+      // console.log("zoom zoom", evt);
+      var deltaY = evt.deltaY;
+
+      if (deltaY < 0) {
+        _this.zoomIn(Math.log(Math.abs(deltaY)) | 0);
+      } else {
+        _this.zoomOut(Math.log(Math.abs(deltaY)) | 0);
+      }
+    };
+
+    this.pdfContainer.addEventListener('wheel', function (evt) {
+      if (evt.ctrlKey && !_fullscreen__WEBPACK_IMPORTED_MODULE_0__["default"].isFullscreen()) {
+        zoomer(evt);
+      }
+    });
+    document.addEventListener('wheel', function (evt) {
+      if (evt.ctrlKey && _fullscreen__WEBPACK_IMPORTED_MODULE_0__["default"].isFullscreen()) {
+        zoomer(evt);
+      }
+    });
+    this.eventBus.on("scalechanging", function (evt) {
+      if (_this.scrollToPage === 0 && evt.source === _this.pdfViewer) {
+        _this.scrollToPage = _this.pdfViewer.currentPageNumber; // console.log("scalechanging, page = " + this.pdfViewer.currentPageNumber, evt);
+      }
+    });
+    this.eventBus.on("updateviewarea", function (evt) {
+      if (_this.scrollToPage > 0 && evt.source === _this.pdfViewer) {
+        // console.log("updateviewarea, scroll to page = " + this.scrollToPage, evt);
+        var newPageNumber = _this.scrollToPage;
+        _this.scrollToPage = 0;
+        setTimeout(function () {
+          _this.scrollPageIntoView(newPageNumber);
+        }, 10);
+      }
+    });
   }
   /**
    * Open a PDF.
@@ -291,27 +331,30 @@ function () {
   }, {
     key: "zoomIn",
     value: function zoomIn(ticks) {
+      var scaleFactor = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : DEFAULT_SCALE_DELTA;
       var newScale = this.pdfViewer.currentScale;
 
       do {
-        newScale = (newScale * DEFAULT_SCALE_DELTA).toFixed(2);
-        newScale = Math.ceil(newScale * 10) / 10;
-        newScale = Math.min(MAX_SCALE, newScale);
+        newScale = (newScale * scaleFactor).toFixed(4);
       } while (--ticks && newScale < MAX_SCALE);
 
+      newScale = Math.ceil(newScale * 100) / 100;
+      newScale = Math.min(MAX_SCALE, newScale);
       this.pdfViewer.currentScaleValue = newScale;
     }
   }, {
     key: "zoomOut",
     value: function zoomOut(ticks) {
+      var scaleFactor = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : DEFAULT_SCALE_DELTA;
       var newScale = this.pdfViewer.currentScale;
+      var page = this.page;
 
       do {
-        newScale = (newScale / DEFAULT_SCALE_DELTA).toFixed(2);
-        newScale = Math.floor(newScale * 10) / 10;
-        newScale = Math.max(MIN_SCALE, newScale);
+        newScale = (newScale / scaleFactor).toFixed(4);
       } while (--ticks && newScale > MIN_SCALE);
 
+      newScale = Math.floor(newScale * 100) / 100;
+      newScale = Math.max(MIN_SCALE, newScale);
       this.pdfViewer.currentScaleValue = newScale;
     }
   }, {
@@ -512,7 +555,7 @@ function () {
       pageNumber.setAttribute("size", "3");
       pageNumber.setAttribute("value", "1");
       pageNumber.classList.add("pager-number");
-      pageNumber.addEventListener("click", function () {
+      pageNumber.addEventListener("click", function (evt) {
         evt.preventDefault();
         evt.stopPropagation();
         this.select();
@@ -579,7 +622,7 @@ function () {
       download.setAttribute("title", "Download");
       download.setAttribute("type", "button");
       download.textContent = "Download";
-      download.addEventListener("click", function () {
+      download.addEventListener("click", function (evt) {
         evt.preventDefault();
         evt.stopPropagation();
         window.location = _this7.url;
@@ -608,7 +651,7 @@ function () {
         externalLinkTarget: EXTERNAL_LINK_TARGET
       });
       this.l10n = pdfjsViewer.NullL10n;
-      var pdfViewer = new pdfjsViewer.PDFViewer({
+      var pdfViewerOptions = {
         container: this.pdfContainer,
         linkService: this.pdfLinkService,
         l10n: this.l10n,
@@ -616,7 +659,14 @@ function () {
         textLayerMode: TEXT_LAYER_MODE,
         eventBus: this.eventBus,
         cMapPacked: CMAP_PACKED
-      });
+      };
+
+      if (isAndroid) {
+        // Workaround poor pinch-zoom behavior by disabling text layer.
+        pdfViewerOptions.textLayerMode = 0;
+      }
+
+      var pdfViewer = new pdfjsViewer.PDFViewer(pdfViewerOptions);
       this.pdfViewer = pdfViewer;
       this.pdfLinkService.setViewer(pdfViewer);
       this.pdfHistory = new pdfjsViewer.PDFHistory({
@@ -719,7 +769,7 @@ function () {
         _this10.documentInfo = data.info;
         _this10.metadata = data.metadata; // Provides some basic debug information
 
-        console.log("PDF " + _this10.pdfDocument.fingerprint + ", " + (data.info.Title || data.info.Subject || "-") + " [" + data.info.PDFFormatVersion + " " + (data.info.Producer || "-").trim() + " / " + (data.info.Creator || "-").trim() + "]" + (data.info.IsAcroFormPresent ? " AcroForm " : "") + " (PDF.js: " + (pdfjsLib.version || "-") + ")");
+        console.log("PDF " + _this10.pdfDocument.fingerprint + ", " + (data.info.Title || data.info.Subject || _this10.title || "-") + " [" + data.info.PDFFormatVersion + " " + (data.info.Producer || "-").trim() + " / " + (data.info.Creator || "-").trim() + "]" + (data.info.IsAcroFormPresent ? " AcroForm " : "") + " (PDF.js: " + (pdfjsLib.version || "-") + ")");
       });
     }
   }, {

@@ -8,12 +8,13 @@ let animationStartedPromise;
 (function animationStartedClosure() {
 	// The offsetParent is not set until the PDF.js iframe or object is visible.
 	// Waiting for first animation.
-	animationStartedPromise = new Promise(function(resolve) {
+	animationStartedPromise = new Promise(function (resolve) {
 		window.requestAnimationFrame(resolve);
 	});
 })();
 
 let id = 0;
+
 function generateId() {
 	id++;
 	return `epdf_${id}`;
@@ -53,7 +54,7 @@ const EXTERNAL_LINK_TARGET = 2;
 const MAX_MOBILE_IMAGE_SIZE = 5242880;
 const CMAP_PACKED = true;
 const DEFAULT_SCALE = 1.0;
-const CSS_UNITS = 96/72;
+const CSS_UNITS = 96 / 72;
 const DEFAULT_SCALE_DELTA = 1.1;
 const MIN_SCALE = 0.25;
 const MAX_SCALE = 10.0;
@@ -79,20 +80,6 @@ class EngagePDFViewer {
 		if (!this.viewerContainer.hasAttribute("id")) {
 			this.viewerContainer.setAttribute("id", generateId());
 		}
-		this.viewerContainer.addEventListener('touchstart', (evt) => {
-			this.viewerContainer.classList.add("active");
-			this.pdfContainer.classList.add("active");
-		});
-		document.documentElement.addEventListener("touchend", (evt) => {
-			const path = evt.path || (evt.composedPath && evt.composedPath());
-			if (!path) return;
-			const found = path.find((el) => el.classList && el.classList.contains("engage-pdfviewer"));
-			if (!found) {
-				// console.log("Touched outside pdf viewer. Deactivating.");
-				this.viewerContainer.classList.remove("active");
-				this.pdfContainer.classList.remove("active");
-			}
-		});
 
 		this.pdfLoadingTask = null;
 		this.pdfDocument = null;
@@ -103,7 +90,60 @@ class EngagePDFViewer {
 		this.metadata = null;
 		this.documentInfo = null;
 		this.eventBus = new pdfjsViewer.EventBus({dispatchToDOM: false});
+		this.scrollToPage = 0;
 		this._createUI();
+
+		// Touch support for activating and deactivating scrollbars (if setup in CSS)
+		this.viewerContainer.addEventListener('touchstart', (evt) => {
+			this.viewerContainer.classList.add("active");
+			this.pdfContainer.classList.add("active");
+		});
+		document.documentElement.addEventListener("touchstart", (evt) => {
+			const path = evt.path || (evt.composedPath && evt.composedPath());
+			if (!path) return;
+			const found = path.find((el) => el.classList && el.classList.contains("engage-pdfviewer"));
+			if (!found) {
+				// console.log("Touched outside pdf viewer. Deactivating.");
+				this.viewerContainer.classList.remove("active");
+				this.pdfContainer.classList.remove("active");
+			}
+		});
+
+		const zoomer = (evt) => {
+			// console.log("zoom zoom", evt);
+			const deltaY = evt.deltaY;
+			if (deltaY < 0) {
+				this.zoomIn(Math.log(Math.abs(deltaY)) | 0);
+			} else {
+				this.zoomOut(Math.log(Math.abs(deltaY)) | 0);
+			}
+		};
+		this.pdfContainer.addEventListener('wheel', (evt) => {
+			if (evt.ctrlKey && !fullScreenApi.isFullscreen()) {
+				zoomer(evt);
+			}
+		});
+		document.addEventListener('wheel', (evt) => {
+			if (evt.ctrlKey && fullScreenApi.isFullscreen()) {
+				zoomer(evt);
+			}
+		});
+		this.eventBus.on("scalechanging", (evt) => {
+			if (this.scrollToPage === 0 && evt.source === this.pdfViewer) {
+				this.scrollToPage = this.pdfViewer.currentPageNumber;
+				// console.log("scalechanging, page = " + this.pdfViewer.currentPageNumber, evt);
+			}
+		});
+		this.eventBus.on("updateviewarea", (evt) => {
+			if (this.scrollToPage > 0  && evt.source === this.pdfViewer) {
+				// console.log("updateviewarea, scroll to page = " + this.scrollToPage, evt);
+				const newPageNumber = this.scrollToPage;
+				this.scrollToPage = 0;
+				setTimeout(() => {
+					this.scrollPageIntoView(newPageNumber);
+				}, 10);
+			}
+		});
 	}
 
 	/**
@@ -190,23 +230,24 @@ class EngagePDFViewer {
 		this.loadingBar.setAttribute("hidden", "");
 	}
 
-	zoomIn(ticks) {
+	zoomIn(ticks, scaleFactor = DEFAULT_SCALE_DELTA) {
 		let newScale = this.pdfViewer.currentScale;
 		do {
-			newScale = (newScale * DEFAULT_SCALE_DELTA).toFixed(2);
-			newScale = Math.ceil(newScale * 10) / 10;
-			newScale = Math.min(MAX_SCALE, newScale);
+			newScale = (newScale * scaleFactor).toFixed(4);
 		} while (--ticks && newScale < MAX_SCALE);
+		newScale = Math.ceil(newScale * 100) / 100;
+		newScale = Math.min(MAX_SCALE, newScale);
 		this.pdfViewer.currentScaleValue = newScale;
 	}
 
-	zoomOut(ticks) {
+	zoomOut(ticks, scaleFactor = DEFAULT_SCALE_DELTA) {
 		let newScale = this.pdfViewer.currentScale;
+		const page = this.page;
 		do {
-			newScale = (newScale / DEFAULT_SCALE_DELTA).toFixed(2);
-			newScale = Math.floor(newScale * 10) / 10;
-			newScale = Math.max(MIN_SCALE, newScale);
+			newScale = (newScale / scaleFactor).toFixed(4);
 		} while (--ticks && newScale > MIN_SCALE);
+		newScale = Math.floor(newScale * 100) / 100;
+		newScale = Math.max(MIN_SCALE, newScale);
 		this.pdfViewer.currentScaleValue = newScale;
 	}
 
@@ -395,7 +436,7 @@ class EngagePDFViewer {
 		pageNumber.setAttribute("size", "3");
 		pageNumber.setAttribute("value", "1");
 		pageNumber.classList.add("pager-number");
-		pageNumber.addEventListener("click", function() {
+		pageNumber.addEventListener("click", function (evt) {
 			evt.preventDefault();
 			evt.stopPropagation();
 			this.select();
@@ -454,7 +495,7 @@ class EngagePDFViewer {
 		download.setAttribute("title", "Download");
 		download.setAttribute("type", "button");
 		download.textContent = "Download";
-		download.addEventListener("click", () => {
+		download.addEventListener("click", (evt) => {
 			evt.preventDefault();
 			evt.stopPropagation();
 			window.location = this.url;
@@ -479,7 +520,7 @@ class EngagePDFViewer {
 			externalLinkTarget: EXTERNAL_LINK_TARGET,
 		});
 		this.l10n = pdfjsViewer.NullL10n;
-		let pdfViewer = new pdfjsViewer.PDFViewer({
+		let pdfViewerOptions = {
 			container: this.pdfContainer,
 			linkService: this.pdfLinkService,
 			l10n: this.l10n,
@@ -487,7 +528,12 @@ class EngagePDFViewer {
 			textLayerMode: TEXT_LAYER_MODE,
 			eventBus: this.eventBus,
 			cMapPacked: CMAP_PACKED,
-		});
+		};
+		if (isAndroid) {
+			// Workaround poor pinch-zoom behavior by disabling text layer.
+			pdfViewerOptions.textLayerMode = 0;
+		}
+		let pdfViewer = new pdfjsViewer.PDFViewer(pdfViewerOptions);
 		this.pdfViewer = pdfViewer;
 		this.pdfLinkService.setViewer(pdfViewer);
 
@@ -544,7 +590,7 @@ class EngagePDFViewer {
 	}
 
 	_rescaleIfNecessary(tryCount) {
-		let newTryCount = (tryCount||0) + 1;
+		let newTryCount = (tryCount || 0) + 1;
 		if (newTryCount > 10) {
 			console.log(`Giving up trying to rescale for div#${this.viewerContainer.id}.`);
 			return;
@@ -579,7 +625,7 @@ class EngagePDFViewer {
 			console.log(
 					"PDF " +
 					this.pdfDocument.fingerprint +
-					", " + (data.info.Title || data.info.Subject || "-") +
+					", " + (data.info.Title || data.info.Subject || this.title || "-") +
 					" [" +
 					data.info.PDFFormatVersion +
 					" " +

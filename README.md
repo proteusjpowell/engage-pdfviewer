@@ -13,3 +13,5 @@ for your project.
 
 If you have problems loading PDFs due to CORs issues, see 
 https://github.com/mozilla/pdf.js/wiki/Frequently-Asked-Questions#faq-xhr
+
+You should set meta viewport to get the desired behavior for the overall webpage.
