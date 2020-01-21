@@ -120,6 +120,7 @@ class EngagePDFViewer {
 		};
 		this.pdfContainer.addEventListener('wheel', (evt) => {
 			if (evt.ctrlKey && !fullScreenApi.isFullscreen()) {
+				evt.preventDefault();
 				zoomer(evt);
 			}
 		});

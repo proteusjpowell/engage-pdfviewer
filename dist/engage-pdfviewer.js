@@ -239,6 +239,7 @@ function () {
 
     this.pdfContainer.addEventListener('wheel', function (evt) {
       if (evt.ctrlKey && !_fullscreen__WEBPACK_IMPORTED_MODULE_0__["default"].isFullscreen()) {
+        evt.preventDefault();
         zoomer(evt);
       }
     });
