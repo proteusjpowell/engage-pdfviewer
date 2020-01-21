@@ -8,6 +8,7 @@ htmlWebpackPlugin.options.scripts = htmlWebpackPlugin.options.scripts || []
 -->
 <head>
     <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
     <title><%= htmlWebpackPlugin.options.title %></title>
     <% for (item of htmlWebpackPlugin.options.links) { %> <%
         if (typeof item === 'string' || item instanceof String) {
