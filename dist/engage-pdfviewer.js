@@ -200,10 +200,39 @@ function () {
     this.documentInfo = null;
     this.eventBus = new pdfjsViewer.EventBus({
       dispatchToDOM: false
-    });
-    this.scrollToPage = 0;
+    }); //this.scrollToPage = 0;
 
-    this._createUI(); // Touch support for activating and deactivating scrollbars (if setup in CSS)
+    this._createUI();
+
+    if (ResizeObserver) {
+      this.resizeObserver = new ResizeObserver(function (entries) {
+        var _iteratorNormalCompletion = true;
+        var _didIteratorError = false;
+        var _iteratorError = undefined;
+
+        try {
+          for (var _iterator = entries[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
+            var entry = _step.value;
+            _this.pdfViewer.currentScaleValue = DEFAULT_SCALE_VALUE;
+
+            _this._rescaleIfNecessary();
+          }
+        } catch (err) {
+          _didIteratorError = true;
+          _iteratorError = err;
+        } finally {
+          try {
+            if (!_iteratorNormalCompletion && _iterator["return"] != null) {
+              _iterator["return"]();
+            }
+          } finally {
+            if (_didIteratorError) {
+              throw _iteratorError;
+            }
+          }
+        }
+      });
+    } // Touch support for activating and deactivating scrollbars (if setup in CSS)
 
 
     this.viewerContainer.addEventListener('touchstart', function (evt) {
@@ -247,22 +276,22 @@ function () {
       if (evt.ctrlKey && _fullscreen__WEBPACK_IMPORTED_MODULE_0__["default"].isFullscreen()) {
         zoomer(evt);
       }
-    });
-    this.eventBus.on("scalechanging", function (evt) {
-      if (_this.scrollToPage === 0 && evt.source === _this.pdfViewer) {
-        _this.scrollToPage = _this.pdfViewer.currentPageNumber; // console.log("scalechanging, page = " + this.pdfViewer.currentPageNumber, evt);
-      }
-    });
-    this.eventBus.on("updateviewarea", function (evt) {
-      if (_this.scrollToPage > 0 && evt.source === _this.pdfViewer) {
-        // console.log("updateviewarea, scroll to page = " + this.scrollToPage, evt);
-        var newPageNumber = _this.scrollToPage;
-        _this.scrollToPage = 0;
-        setTimeout(function () {
-          _this.scrollPageIntoView(newPageNumber);
-        }, 10);
-      }
-    });
+    }); // this.eventBus.on("scalechanging", (evt) => {
+    // 	if (this.scrollToPage === 0 && evt.source === this.pdfViewer) {
+    // 		this.scrollToPage = this.pdfViewer.currentPageNumber;
+    // 		// console.log("scalechanging, page = " + this.pdfViewer.currentPageNumber, evt);
+    // 	}
+    // });
+    // this.eventBus.on("updateviewarea", (evt) => {
+    // 	if (this.scrollToPage > 0  && evt.source === this.pdfViewer) {
+    // 		// console.log("updateviewarea, scroll to page = " + this.scrollToPage, evt);
+    // 		const newPageNumber = this.scrollToPage;
+    // 		this.scrollToPage = 0;
+    // 		setTimeout(() => {
+    // 			this.scrollPageIntoView(newPageNumber);
+    // 		}, 10);
+    // 	}
+    // });
   }
   /**
    * Open a PDF.
@@ -720,6 +749,7 @@ function () {
 
           _this8._rescaleIfNecessary();
         }, 10);
+        if (_this8.resizeObserver) _this8.resizeObserver.observe(_this8.pdfContainer);
       });
       this.eventBus.on("pagechanging", function () {
         _this8._handleNavigationEnabling();
