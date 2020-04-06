@@ -90,8 +90,17 @@ class EngagePDFViewer {
 		this.metadata = null;
 		this.documentInfo = null;
 		this.eventBus = new pdfjsViewer.EventBus({dispatchToDOM: false});
-		this.scrollToPage = 0;
+		//this.scrollToPage = 0;
 		this._createUI();
+
+		if (typeof ResizeObserver != "undefined") {
+			this.resizeObserver = new ResizeObserver(entries => {
+				for (let entry of entries) {
+					this.pdfViewer.currentScaleValue = DEFAULT_SCALE_VALUE;
+					this._rescaleIfNecessary()
+				}
+			});
+		}
 
 		// Touch support for activating and deactivating scrollbars (if setup in CSS)
 		this.viewerContainer.addEventListener('touchstart', (evt) => {
@@ -129,22 +138,22 @@ class EngagePDFViewer {
 				zoomer(evt);
 			}
 		});
-		this.eventBus.on("scalechanging", (evt) => {
-			if (this.scrollToPage === 0 && evt.source === this.pdfViewer) {
-				this.scrollToPage = this.pdfViewer.currentPageNumber;
-				// console.log("scalechanging, page = " + this.pdfViewer.currentPageNumber, evt);
-			}
-		});
-		this.eventBus.on("updateviewarea", (evt) => {
-			if (this.scrollToPage > 0  && evt.source === this.pdfViewer) {
-				// console.log("updateviewarea, scroll to page = " + this.scrollToPage, evt);
-				const newPageNumber = this.scrollToPage;
-				this.scrollToPage = 0;
-				setTimeout(() => {
-					this.scrollPageIntoView(newPageNumber);
-				}, 10);
-			}
-		});
+		// this.eventBus.on("scalechanging", (evt) => {
+		// 	if (this.scrollToPage === 0 && evt.source === this.pdfViewer) {
+		// 		this.scrollToPage = this.pdfViewer.currentPageNumber;
+		// 		// console.log("scalechanging, page = " + this.pdfViewer.currentPageNumber, evt);
+		// 	}
+		// });
+		// this.eventBus.on("updateviewarea", (evt) => {
+		// 	if (this.scrollToPage > 0  && evt.source === this.pdfViewer) {
+		// 		// console.log("updateviewarea, scroll to page = " + this.scrollToPage, evt);
+		// 		const newPageNumber = this.scrollToPage;
+		// 		this.scrollToPage = 0;
+		// 		setTimeout(() => {
+		// 			this.scrollPageIntoView(newPageNumber);
+		// 		}, 10);
+		// 	}
+		// });
 	}
 
 	/**
@@ -581,6 +590,8 @@ class EngagePDFViewer {
 				this._rescaleIfNecessary();
 			}, 10);
 
+			if (this.resizeObserver)
+				this.resizeObserver.observe(this.pdfContainer);
 		});
 
 		this.eventBus.on("pagechanging", () => {
