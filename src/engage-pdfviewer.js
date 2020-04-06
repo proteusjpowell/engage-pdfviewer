@@ -93,7 +93,7 @@ class EngagePDFViewer {
 		//this.scrollToPage = 0;
 		this._createUI();
 
-		if(ResizeObserver) {
+		if (typeof ResizeObserver != "undefined") {
 			this.resizeObserver = new ResizeObserver(entries => {
 				for (let entry of entries) {
 					this.pdfViewer.currentScaleValue = DEFAULT_SCALE_VALUE;
