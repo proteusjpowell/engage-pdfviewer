@@ -204,7 +204,7 @@ function () {
 
     this._createUI();
 
-    if (ResizeObserver) {
+    if (typeof ResizeObserver != "undefined") {
       this.resizeObserver = new ResizeObserver(function (entries) {
         var _iteratorNormalCompletion = true;
         var _didIteratorError = false;
