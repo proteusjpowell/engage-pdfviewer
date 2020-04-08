@@ -642,6 +642,22 @@ function () {
       return container;
     }
   }, {
+    key: "_getParentAttribute",
+    value: function _getParentAttribute(el, attributeName) {
+      if (el === document || el === undefined || el == null) return null;
+      var parent = el;
+
+      while (parent != document.body && parent != null) {
+        if (parent.getAttribute(attributeName)) {
+          return parent.getAttribute(attributeName);
+        }
+
+        parent = parent.parentNode;
+      }
+
+      return null;
+    }
+  }, {
     key: "_createDownloadButton",
     value: function _createDownloadButton() {
       var _this7 = this;
@@ -651,6 +667,19 @@ function () {
       download.classList.add("download-btn");
       download.setAttribute("title", "Download");
       download.setAttribute("type", "button");
+
+      var fileName = this._getParentAttribute(this.viewerContainer, 'data-file-label');
+
+      var fileId = this._getParentAttribute(this.viewerContainer, 'data-file-id');
+
+      if (fileName != null && fileId != null) {
+        download.setAttribute("data-ga-on", "click");
+        download.setAttribute("data-ga-event-category", "Asset - Document");
+        download.setAttribute("data-ga-event-action", "Download");
+        download.setAttribute("data-ga-event-label", fileName);
+        download.setAttribute("data-ga-event-value", fileId);
+      }
+
       download.textContent = "Download";
       download.addEventListener("click", function (evt) {
         evt.preventDefault();

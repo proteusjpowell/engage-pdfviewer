@@ -498,12 +498,36 @@ class EngagePDFViewer {
 		return container;
 	}
 
+	_getParentAttribute(el, attributeName) {
+		if (el === document || el === undefined || el == null) return null;
+		var parent = el;
+		while (parent != document.body && parent != null) {
+			if (parent.getAttribute(attributeName)) {
+				return parent.getAttribute(attributeName);
+			}
+			parent = parent.parentNode;
+		}
+		return null;
+	}
+
 	_createDownloadButton() {
 		let download = document.createElement("button");
 		download.classList.add("btn");
 		download.classList.add("download-btn");
 		download.setAttribute("title", "Download");
 		download.setAttribute("type", "button");
+
+		let fileName = this._getParentAttribute(this.viewerContainer, 'data-file-label');
+		let fileId = this._getParentAttribute(this.viewerContainer, 'data-file-id');
+
+		if (fileName != null && fileId != null) {
+			download.setAttribute("data-ga-on", "click");
+			download.setAttribute("data-ga-event-category", "Asset - Document");
+			download.setAttribute("data-ga-event-action", "Download");
+			download.setAttribute("data-ga-event-label", fileName);
+			download.setAttribute("data-ga-event-value", fileId);
+		}
+
 		download.textContent = "Download";
 		download.addEventListener("click", (evt) => {
 			evt.preventDefault();
