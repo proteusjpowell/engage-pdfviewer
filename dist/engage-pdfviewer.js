@@ -205,6 +205,7 @@ function () {
     this._createUI();
 
     if (typeof ResizeObserver != "undefined") {
+      this.lastContainerSize = null;
       this.resizeObserver = new ResizeObserver(function (entries) {
         var _iteratorNormalCompletion = true;
         var _didIteratorError = false;
@@ -213,9 +214,12 @@ function () {
         try {
           for (var _iterator = entries[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
             var entry = _step.value;
-            _this.pdfViewer.currentScaleValue = DEFAULT_SCALE_VALUE;
+            var newWidth = entry.contentRect.width;
 
-            _this._rescaleIfNecessary();
+            if (_this.lastContainerSize != null && _this.lastContainerSize !== newWidth) {
+              //console.log("ResizeObserver calling rescaleIfNecessary(). "+newWidth + " from " + this.lastContainerSize);
+              _this._rescaleIfNecessary();
+            }
           }
         } catch (err) {
           _didIteratorError = true;
@@ -778,7 +782,12 @@ function () {
 
           _this8._rescaleIfNecessary();
         }, 10);
-        if (_this8.resizeObserver) _this8.resizeObserver.observe(_this8.pdfContainer);
+
+        if (_this8.resizeObserver) {
+          _this8.lastContainerSize = _this8.viewerContainer.clientWidth;
+
+          _this8.resizeObserver.observe(_this8.viewerContainer);
+        }
       });
       this.eventBus.on("pagechanging", function () {
         _this8._handleNavigationEnabling();

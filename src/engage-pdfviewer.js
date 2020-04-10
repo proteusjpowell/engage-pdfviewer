@@ -94,10 +94,14 @@ class EngagePDFViewer {
 		this._createUI();
 
 		if (typeof ResizeObserver != "undefined") {
+			this.lastContainerSize = null;
 			this.resizeObserver = new ResizeObserver(entries => {
 				for (let entry of entries) {
-					this.pdfViewer.currentScaleValue = DEFAULT_SCALE_VALUE;
-					this._rescaleIfNecessary()
+					let newWidth = entry.contentRect.width;
+					if (this.lastContainerSize != null && this.lastContainerSize !== newWidth) {
+						//console.log("ResizeObserver calling rescaleIfNecessary(). "+newWidth + " from " + this.lastContainerSize);
+						this._rescaleIfNecessary();
+					}
 				}
 			});
 		}
@@ -614,8 +618,10 @@ class EngagePDFViewer {
 				this._rescaleIfNecessary();
 			}, 10);
 
-			if (this.resizeObserver)
-				this.resizeObserver.observe(this.pdfContainer);
+			if (this.resizeObserver) {
+				this.lastContainerSize = this.viewerContainer.clientWidth;
+				this.resizeObserver.observe(this.viewerContainer);
+			}
 		});
 
 		this.eventBus.on("pagechanging", () => {
