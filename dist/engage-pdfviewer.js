@@ -299,7 +299,7 @@ function () {
   }
   /**
    * Open a PDF.
-   * @param options options are: url. "url" is required.
+   * @param options are: url, worker_url, and cmap_url, max_mobile_image_size. "url" is required.
    */
 
 
@@ -412,7 +412,7 @@ function () {
       var docOptions = {
         url: options.url
       };
-      if (isIOS || isAndroid) docOptions.maxImageSize = MAX_MOBILE_IMAGE_SIZE;
+      if (isIOS || isAndroid) docOptions.maxImageSize = options.max_mobile_image_size || MAX_MOBILE_IMAGE_SIZE;
       var loadingTask = pdfjsLib.getDocument(docOptions);
       this.pdfLoadingTask = loadingTask;
       this.showLoadingBar();

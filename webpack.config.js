@@ -6,8 +6,7 @@ const CopyWebpackPlugin = require('copy-webpack-plugin');
 module.exports = {
 	mode: 'development',
 	entry: {
-		"engage-pdfviewer": ['./src/engage-pdfviewer.js'],
-		example: './src/index.js'
+		"engage-pdfviewer": ['./src/engage-pdfviewer.js']
 	},
 	devtool: 'source-map',
 	devServer: {

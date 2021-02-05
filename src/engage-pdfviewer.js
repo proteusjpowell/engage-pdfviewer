@@ -162,7 +162,7 @@ class EngagePDFViewer {
 
 	/**
 	 * Open a PDF.
-	 * @param options options are: url. "url" is required.
+	 * @param options are: url, worker_url, and cmap_url, max_mobile_image_size. "url" is required.
 	 */
 	open(options) {
 		animationStartedPromise.then(() => this._open(options));
@@ -283,7 +283,7 @@ class EngagePDFViewer {
 			url: options.url,
 		};
 		if (isIOS || isAndroid)
-			docOptions.maxImageSize = MAX_MOBILE_IMAGE_SIZE;
+			docOptions.maxImageSize = options.max_mobile_image_size || MAX_MOBILE_IMAGE_SIZE;
 		const loadingTask = pdfjsLib.getDocument(docOptions);
 		this.pdfLoadingTask = loadingTask;
 		this.showLoadingBar();
